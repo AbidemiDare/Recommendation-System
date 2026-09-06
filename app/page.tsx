@@ -1,31 +1,67 @@
 "use client";
 
-import { Bot } from 'lucide-react';
-import BackgroundCircles from './Components/BackgroundCircles';
-import Link from 'next/link';
+import BackgroundCircles from "./Components/BackgroundCircles";
+import Link from "next/link";
+import Image from "next/image";
 
 export default function Home() {
   return (
-    <section className="fixed w-full h-full grid place-items-center pt-11 pb-8.5 bg-[#F8F8F8] font-sans">
-    <div className="max-w-90 mx-auto px-6">
+    <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#F8F8F8] px-6 py-10 font-sans">
+
+      {/* Background Decorations */}
       <BackgroundCircles />
 
-      {/* Bot icon */}
-      <div className="grid place-items-center">
-      <span className="h-35 w-35 grid place-items-center mb-4 rounded-[70px] bg-[#EEF2FF]"><Bot className='text-blue-300 text-3xl'/></span>
-      </div>
-      <h1 className="text-[32px] leading-10.5 text-center text-[#1E293B] font-bold">AI-Based Student Project Recommendation System</h1>
-      <p className="text-[16px] pt-4 pb-12 font-normal leading-9 text-center text-[#64748B]">Develop smart project ideas tailored to your skills, interests and academic goals</p>
+      <div className="relative z-10 w-full max-w-md text-center">
 
-      <Link href="/auth/login">
-        <button className="bg-[#2563EB] mb-4 h-14 w-full rounded-[14px] text-[#ffffff] text-[16px] font-semibold">Get started</button>
-      </Link>
+        {/* Robot Icon */}
+        <div className="mb-8 flex justify-center">
+          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-lg">
 
-      <div className="w-full grid place-items-center">
-        <p className="font-normal text-[14px] text-[#64748B]">Already have an aaccount? <span className="text-[14px] text-[#2563EB]"><Link href="">Login</Link></span> </p>
+            <Image
+              src="/robot.png"
+              width={70}
+              height={70}
+              alt="Robot"
+              className="object-contain"
+            />
+
+          </div>
+        </div>
+
+        {/* Heading */}
+        <h1 className="text-3xl font-bold leading-tight text-[#1E293B] sm:text-4xl">
+          AI-Based Student Project Recommendation System
+        </h1>
+
+        {/* Description */}
+        <p className="mt-5 text-base leading-7 text-[#64748B] sm:text-lg">
+          Discover smart project ideas tailored to your skills,
+          interests, and academic goals.
+        </p>
+
+        {/* Button */}
+        <div className="mt-10">
+          <Link href="/login">
+            <button className="h-14 w-full cursor-pointer rounded-2xl bg-[#2563EB] text-base font-semibold text-white transition hover:bg-blue-700">
+              Get Started
+            </button>
+          </Link>
+        </div>
+
+        {/* Login */}
+        <p className="mt-6 text-sm text-[#64748B] sm:text-base">
+          Already have an account?{" "}
+          <Link
+            href="/login"
+            className="font-semibold text-[#2563EB] hover:underline"
+          >
+            Login
+          </Link>
+        </p>
+
       </div>
 
-      </div>
-     </section>
+    </section>
   );
 }
+
