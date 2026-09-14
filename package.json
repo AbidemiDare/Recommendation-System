@@ -9,8 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.117.1",
-    "@google/genai": "^2.19.0",
+    "@google/genai": "^2.21.0",
     "@prisma/client": "^7.9.1",
     "@supabase/supabase-js": "^2.111.0",
     "dotenv": "^17.4.2",

@@ -1,253 +1,464 @@
+import { GoogleGenAI, Type } from "@google/genai";
 import { NextResponse } from "next/server";
-import { getRecommendations } from "@/app/lib/gemini";
-import { RecommendedProject } from "@/app/types/recommendation";
 
-const FALLBACK_PROJECTS: RecommendedProject[] = [
-  {
-    id: "proj-1",
-    title: "AI Medical Image Classifier",
-    description:
-      "Build a model that classifies medical images to support early diagnosis and clinical decision-making.",
-    whyThisMatches:
-      "Strong match for students with Python, ML, and healthcare interests who want hands-on AI + analytics work.",
-    matchScore: 94,
-    techStack: ["Python", "TensorFlow", "React"],
-    difficulty: "Advanced",
-    keyFeatures: [
-      "Dataset preprocessing and image augmentation",
-      "Model training and validation pipeline",
-      "Interactive dashboard for results visualization",
-    ],
-  },
-  {
-    id: "proj-2",
-    title: "E-Commerce Recommendation Engine",
-    description:
-      "Create a recommendation system that suggests relevant products based on user behavior and preferences.",
-    whyThisMatches:
-      "Perfect for students interested in personalization, data science, and product-driven AI systems.",
-    matchScore: 91,
-    techStack: ["Next.js", "Python", "TailwindCSS"],
-    difficulty: "Intermediate",
-    keyFeatures: [
-      "Collaborative filtering logic",
-      "Personalized product cards",
-      "Analytics dashboard for click-through performance",
-    ],
-  },
-  {
-    id: "proj-3",
-    title: "Student Progress Tracker",
-    description:
-      "Develop a system to track academic milestones, coursework progress, and performance insights for students.",
-    whyThisMatches:
-      "A practical fit for students who want a web app with analytics and a clear, real-world user story.",
-    matchScore: 88,
-    techStack: ["TypeScript", "React", "Node.js"],
-    difficulty: "Beginner",
-    keyFeatures: [
-      "Progress dashboard and visual summaries",
-      "Course and assignment tracking",
-      "Alerts for academic milestones",
-    ],
-  },
-  {
-    id: "proj-4",
-    title: "Intelligent Learning Assistant",
-    description:
-      "Build a chatbot or assistant that helps students find content, summarize notes, and recommend learning paths.",
-    whyThisMatches:
-      "Good fit for students who enjoy NLP, chat interfaces, and practical educational technology applications.",
-    matchScore: 86,
-    techStack: ["Python", "React", "FastAPI"],
-    difficulty: "Intermediate",
-    keyFeatures: [
-      "Prompt-driven educational assistant",
-      "Course material summarization",
-      "Personalized study recommendations",
-    ],
-  },
-  {
-    id: "proj-5",
-    title: "Cybersecurity Awareness Dashboard",
-    description:
-      "Design a security monitoring dashboard that highlights vulnerabilities, logs, and best-practice recommendations.",
-    whyThisMatches:
-      "Strong option for students with interest in cybersecurity, dashboards, and systems/defense tooling.",
-    matchScore: 84,
-    techStack: ["Node.js", "React", "Python"],
-    difficulty: "Advanced",
-    keyFeatures: [
-      "Threat summary analytics",
-      "Security posture reporting",
-      "User-friendly alert monitoring view",
-    ],
-  },
-  {
-    id: "proj-6",
-    title: "Smart Campus Navigation System",
-    description:
-      "Create a location-aware campus guide that helps students find facilities, services, and accessible routes.",
-    whyThisMatches:
-      "A practical fit for students interested in mobile development, maps, and user-centered campus technology.",
-    matchScore: 82,
-    techStack: ["Flutter", "Firebase", "Google Maps API"],
-    difficulty: "Intermediate",
-    keyFeatures: [
-      "Interactive campus map",
-      "Searchable facilities and services",
-      "Accessible route suggestions",
-    ],
-  },
-  {
-    id: "proj-7",
-    title: "IoT-Based Smart Agriculture Monitor",
-    description:
-      "Monitor soil and environmental conditions with connected sensors and a dashboard for agricultural decisions.",
-    whyThisMatches:
-      "Well suited to students interested in IoT, embedded systems, data collection, and sustainability.",
-    matchScore: 80,
-    techStack: ["Python", "Arduino", "MQTT", "React"],
-    difficulty: "Advanced",
-    keyFeatures: [
-      "Real-time sensor readings",
-      "Environmental threshold alerts",
-      "Historical data visualizations",
-    ],
-  },
-  {
-    id: "proj-8",
-    title: "Blockchain Certificate Verification Platform",
-    description:
-      "Build a tamper-resistant platform for issuing and verifying academic certificates online.",
-    whyThisMatches:
-      "A focused option for students interested in blockchain, security, and verifiable digital records.",
-    matchScore: 78,
-    techStack: ["TypeScript", "Next.js", "Solidity"],
-    difficulty: "Advanced",
-    keyFeatures: [
-      "Certificate issuance workflow",
-      "Public verification page",
-      "Tamper-evident record references",
-    ],
-  },
-];
+// GEMINI_API_KEY must be set server-side (e.g. .env.local) — the previous
+// `new GoogleGenAI()` call with no config was the reason nothing came back:
+// every request was failing auth before it reached the model.
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-const PROJECT_BY_ID = new Map(FALLBACK_PROJECTS.map((project) => [project.id, project]));
+// DNS/network blips (EAI_AGAIN, ETIMEDOUT, connection resets) are transient —
+// retrying a couple of times with a short backoff clears most of them
+// without surfacing an error to the user at all. Non-network errors (bad
+// API key, invalid model, schema failures) are NOT retried — those won't
+// succeed on attempt 2 either, so we fail fast instead of wasting time.
+const RETRYABLE_CODES = new Set(["EAI_AGAIN", "ENOTFOUND", "ETIMEDOUT", "ECONNRESET"]);
 
-function normalizeStudentProfile(payload: unknown) {
-  if (!payload || typeof payload !== "object") {
-    return {
-      name: "Student",
-      interests: [],
-      skills: [],
-      department: "",
-      level: "",
-    };
+async function generateContentWithRetry(
+  params: Parameters<typeof ai.models.generateContent>[0],
+  attempts = 3
+) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await ai.models.generateContent(params);
+    } catch (err) {
+      lastError = err;
+      const code = (err as { cause?: { code?: string }; code?: string })?.cause?.code
+        ?? (err as { code?: string })?.code;
+      const isRetryable = code ? RETRYABLE_CODES.has(code) : false;
+      if (!isRetryable || attempt === attempts - 1) throw err;
+      console.warn(`[gemini] ${code} on attempt ${attempt + 1}/${attempts}, retrying...`);
+      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+    }
   }
+  throw lastError;
+}
 
-  const student = payload as Record<string, unknown>;
+const RecommendationSchema = {
+  type: Type.OBJECT,
+  properties: {
+    recommendations: {
+      type: Type.ARRAY,
+      minItems: 12,
+      description: "At least 12 distinct, tailored final-year project topics.",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          id: { type: Type.STRING, description: "short kebab-case slug, unique within this response" },
+          title: { type: Type.STRING },
+          description: { type: Type.STRING },
+          techStack: { type: Type.ARRAY, items: { type: Type.STRING } },
+          difficulty: { type: Type.STRING, enum: ["Beginner", "Intermediate", "Advanced"] },
+          matchScore: { type: Type.NUMBER, description: "0-100 fit score, varied realistically — not all 90+" },
+          rationale: { type: Type.STRING },
+          domainTags: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "1-3 short domain labels the dashboard uses for filtering, e.g. ['Web Development']",
+          },
+        },
+        required: ["id", "title", "description", "techStack", "difficulty", "matchScore", "rationale", "domainTags"],
+      },
+    },
+  },
+  required: ["recommendations"],
+};
 
+// The onboarding form saves { major, technicalSkills, careerGoals, preferredDomain,
+// complexityPreference } — this route previously read { skills, careerGoal, domain },
+// which don't exist on that object, so studentProfile.skills.join(...) threw on every
+// request. Reading both spellings makes this route work regardless of which one is live.
+interface StudentProfilePayload {
+  major?: string;
+  technicalSkills?: string[];
+  skills?: string[];
+  careerGoals?: string;
+  careerGoal?: string;
+  preferredDomain?: string;
+  domain?: string;
+  complexityPreference?: string;
+}
+
+function normalizeProfile(payload: StudentProfilePayload) {
+  const skills = payload.technicalSkills ?? payload.skills ?? [];
   return {
-    name: typeof student.name === "string" ? student.name : "Student",
-    interests: Array.isArray(student.interests)
-      ? student.interests.filter((item): item is string => typeof item === "string")
-      : typeof student.interests === "string"
-        ? student.interests
-            .split(",")
-            .map((part) => part.trim())
-            .filter(Boolean)
-        : [],
-    skills: Array.isArray(student.skills)
-      ? student.skills.filter((item): item is string => typeof item === "string")
-      : typeof student.skills === "string"
-        ? student.skills
-            .split(",")
-            .map((part) => part.trim())
-            .filter(Boolean)
-        : [],
-    department: typeof student.department === "string" ? student.department : "",
-    level: typeof student.level === "string" ? student.level : "",
+    major: (payload.major ?? "").trim(),
+    skills: Array.isArray(skills) ? skills : [],
+    careerGoals: (payload.careerGoals ?? payload.careerGoal ?? "").trim(),
+    domain: (payload.preferredDomain ?? payload.domain ?? "").trim(),
+    complexity: payload.complexityPreference ?? "Any",
   };
 }
 
 export async function POST(req: Request) {
+  let body: StudentProfilePayload;
   try {
-    const payload = await req.json();
-    const student = normalizeStudentProfile(payload);
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON" }, { status: 400 });
+  }
 
-    const prompt = `
-      You are an expert academic project advisor.
+  const profile = normalizeProfile(body);
 
-      Student profile:
-      ${JSON.stringify(student, null, 2)}
+  if (!profile.major || profile.skills.length === 0 || !profile.careerGoals || !profile.domain) {
+    return NextResponse.json(
+      { error: "Missing required profile fields (major, skills, career goals, domain)" },
+      { status: 400 }
+    );
+  }
 
-      Recommend up to 5 final-year computer science project ideas that best fit this student.
-      Use the following constraints:
-      - Match the student's skills, interests, academic performance, and career goals closely.
-      - Prioritize projects that are realistic for a university final-year deliverable.
-      - Include a project title, concise description, short explanation of why it matches, match score from 70 to 99, relevant tech stack, difficulty, and 3 key features.
-      - Return valid JSON in the format: { "recommendations": [ ... ] }
-      - Rank and return as many suitable projects as possible, with a target of 8.
-      - Only recommend projects from this catalog. Never invent a project or project ID.
+  try {
+    const response = await generateContentWithRetry({
+      model: "gemini-3.6-flash",
+      contents: `Generate customized final-year project recommendations for the following student profile:
+- Major: ${profile.major}
+- Key Skills: ${profile.skills.join(", ")}
+- Domain Interest: ${profile.domain}
+- Career Goal: ${profile.careerGoals}
+- Preferred Complexity: ${profile.complexity}
 
-      Available project catalog:
-      ${JSON.stringify(FALLBACK_PROJECTS, null, 2)}
-    `;
+Provide AT LEAST 12 actionable, modern, and distinct project ideas — aim for as many genuinely
+distinct, high-quality ideas as you can find for this profile, but never pad the list with
+near-duplicate variations of the same idea just to hit a higher count. Vary difficulty and
+matchScore realistically across the set instead of clustering every score near 100.`,
+      config: {
+        systemInstruction:
+          "You are an academic project advisor. Output structured JSON strictly adhering to the schema provided — no markdown fences, no commentary.",
+        responseMimeType: "application/json",
+        responseSchema: RecommendationSchema,
+        temperature: 0.9,
+        // A 12+ item array with full descriptions/rationale per item is
+        // meaningfully larger than the previous 6-item response — without
+        // raising this, a longer response risks getting cut off mid-JSON,
+        // which would fail JSON.parse below and surface as a 502.
+        maxOutputTokens: 8192,
+      },
+    });
 
-    try {
-      const rawResponse = await getRecommendations(prompt);
-      const parsed = JSON.parse(rawResponse);
-
-      const recommendations = Array.isArray(parsed?.recommendations)
-        ? parsed.recommendations
-            .map((project: unknown): RecommendedProject | null => {
-              if (!project || typeof project !== "object") return null;
-
-              const candidate = project as Partial<RecommendedProject>;
-              const catalogProject = PROJECT_BY_ID.get(String(candidate.id));
-              if (!catalogProject) return null;
-
-              return {
-                ...catalogProject,
-                whyThisMatches: candidate.whyThisMatches
-                  ? String(candidate.whyThisMatches)
-                  : catalogProject.whyThisMatches,
-                matchScore: Number.isFinite(Number(candidate.matchScore))
-                  ? Math.max(0, Math.min(100, Number(candidate.matchScore)))
-                  : catalogProject.matchScore,
-              };
-            })
-            .filter((project: RecommendedProject | null): project is RecommendedProject => project !== null)
-        : [];
-
-      if (recommendations.length > 0) {
-        return NextResponse.json({
-          recommendations,
-          message:
-            recommendations.length < 8
-              ? `Only ${recommendations.length} suitable projects are available.`
-              : undefined,
-        });
-      }
-    } catch (modelError) {
-      console.error("Gemini generation failed, using fallback recommendations:", modelError);
+    const raw = response.text;
+    if (!raw) {
+      return NextResponse.json({ error: "Empty response from Gemini" }, { status: 502 });
     }
 
-    return NextResponse.json({
-      recommendations: FALLBACK_PROJECTS,
-      message:
-        FALLBACK_PROJECTS.length < 8
-          ? `Only ${FALLBACK_PROJECTS.length} suitable projects are available.`
-          : undefined,
+    let data: { recommendations?: unknown };
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return NextResponse.json({ error: "Gemini returned malformed JSON" }, { status: 502 });
+    }
+
+    if (!Array.isArray(data.recommendations) || data.recommendations.length < 12) {
+      return NextResponse.json({ error: "Gemini did not return at least 12 recommendations" }, { status: 502 });
+    }
+
+    // Defensive de-dupe in case the model repeats an id across items.
+    const seen = new Set<string>();
+    const recommendations = (data.recommendations as Array<{ id: string }>).filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
     });
+
+    // Dashboard reads `data.recommendations` — the old `{ projects: [...] }` shape
+    // meant `setProjects(data.recommendations)` on the dashboard was always undefined.
+    return NextResponse.json({ recommendations });
   } catch (error) {
-    console.error("Recommendation route error:", error);
-    return NextResponse.json(
-      { error: "Failed to generate recommendations" },
-      { status: 500 }
-    );
+    console.error("Gemini Recommendation Error:", error);
+    // TEMPORARY: surfaces the real error to the client for local debugging.
+    // Remove `details` (or gate it behind NODE_ENV !== "production") before shipping.
+    const details = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: "Failed to generate recommendations", details }, { status: 500 });
   }
 }
 
+
+// import { GoogleGenAI, Type } from "@google/genai";
+// import { NextResponse } from "next/server";
+
+// // GEMINI_API_KEY must be set server-side (e.g. .env.local) — the previous
+// // `new GoogleGenAI()` call with no config was the reason nothing came back:
+// // every request was failing auth before it reached the model.
+// const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+// const RecommendationSchema = {
+//   type: Type.OBJECT,
+//   properties: {
+//     recommendations: {
+//       type: Type.ARRAY,
+//       minItems: 6,
+//       description: "At least 6 distinct, tailored final-year project topics.",
+//       items: {
+//         type: Type.OBJECT,
+//         properties: {
+//           id: { type: Type.STRING, description: "short kebab-case slug, unique within this response" },
+//           title: { type: Type.STRING },
+//           description: { type: Type.STRING },
+//           techStack: { type: Type.ARRAY, items: { type: Type.STRING } },
+//           difficulty: { type: Type.STRING, enum: ["Beginner", "Intermediate", "Advanced"] },
+//           matchScore: { type: Type.NUMBER, description: "0-100 fit score, varied realistically — not all 90+" },
+//           rationale: { type: Type.STRING },
+//           domainTags: {
+//             type: Type.ARRAY,
+//             items: { type: Type.STRING },
+//             description: "1-3 short domain labels the dashboard uses for filtering, e.g. ['Web Development']",
+//           },
+//         },
+//         required: ["id", "title", "description", "techStack", "difficulty", "matchScore", "rationale", "domainTags"],
+//       },
+//     },
+//   },
+//   required: ["recommendations"],
+// };
+
+// // The onboarding form saves { major, technicalSkills, careerGoals, preferredDomain,
+// // complexityPreference } — this route previously read { skills, careerGoal, domain },
+// // which don't exist on that object, so studentProfile.skills.join(...) threw on every
+// // request. Reading both spellings makes this route work regardless of which one is live.
+// interface StudentProfilePayload {
+//   major?: string;
+//   technicalSkills?: string[];
+//   skills?: string[];
+//   careerGoals?: string;
+//   careerGoal?: string;
+//   preferredDomain?: string;
+//   domain?: string;
+//   complexityPreference?: string;
+// }
+
+// function normalizeProfile(payload: StudentProfilePayload) {
+//   const skills = payload.technicalSkills ?? payload.skills ?? [];
+//   return {
+//     major: (payload.major ?? "").trim(),
+//     skills: Array.isArray(skills) ? skills : [],
+//     careerGoals: (payload.careerGoals ?? payload.careerGoal ?? "").trim(),
+//     domain: (payload.preferredDomain ?? payload.domain ?? "").trim(),
+//     complexity: payload.complexityPreference ?? "Any",
+//   };
+// }
+
+// export async function POST(req: Request) {
+//   let body: StudentProfilePayload;
+//   try {
+//     body = await req.json();
+//   } catch {
+//     return NextResponse.json({ error: "Request body must be valid JSON" }, { status: 400 });
+//   }
+
+//   const profile = normalizeProfile(body);
+
+//   if (!profile.major || profile.skills.length === 0 || !profile.careerGoals || !profile.domain) {
+//     return NextResponse.json(
+//       { error: "Missing required profile fields (major, skills, career goals, domain)" },
+//       { status: 400 }
+//     );
+//   }
+
+//   try {
+//     const response = await ai.models.generateContent({
+//       model: "gemini-3.6-flash",
+//       contents: `Generate customized final-year project recommendations for the following student profile:
+// - Major: ${profile.major}
+// - Key Skills: ${profile.skills.join(", ")}
+// - Domain Interest: ${profile.domain}
+// - Career Goal: ${profile.careerGoals}
+// - Preferred Complexity: ${profile.complexity}
+
+// Provide AT LEAST 6 actionable, modern, and distinct project ideas. Vary difficulty and matchScore
+// realistically across the set instead of clustering every score near 100.`,
+//       config: {
+//         systemInstruction:
+//           "You are an academic project advisor. Output structured JSON strictly adhering to the schema provided — no markdown fences, no commentary.",
+//         responseMimeType: "application/json",
+//         responseSchema: RecommendationSchema,
+//         temperature: 0.9,
+//       },
+//     });
+
+//     const raw = response.text;
+//     if (!raw) {
+//       return NextResponse.json({ error: "Empty response from Gemini" }, { status: 502 });
+//     }
+
+//     let data: { recommendations?: unknown };
+//     try {
+//       data = JSON.parse(raw);
+//     } catch {
+//       return NextResponse.json({ error: "Gemini returned malformed JSON" }, { status: 502 });
+//     }
+
+//     if (!Array.isArray(data.recommendations) || data.recommendations.length < 6) {
+//       return NextResponse.json({ error: "Gemini did not return at least 6 recommendations" }, { status: 502 });
+//     }
+
+//     // Defensive de-dupe in case the model repeats an id across items.
+//     const seen = new Set<string>();
+//     const recommendations = (data.recommendations as Array<{ id: string }>).filter((item) => {
+//       if (seen.has(item.id)) return false;
+//       seen.add(item.id);
+//       return true;
+//     });
+
+//     // Dashboard reads `data.recommendations` — the old `{ projects: [...] }` shape
+//     // meant `setProjects(data.recommendations)` on the dashboard was always undefined.
+//     return NextResponse.json({ recommendations });
+//   } catch (error) {
+//     console.error("Gemini Recommendation Error:", error);
+//     // TEMPORARY: surfaces the real error to the client for local debugging.
+//     // Remove `details` (or gate it behind NODE_ENV !== "production") before shipping.
+//     const details = error instanceof Error ? error.message : String(error);
+//     return NextResponse.json({ error: "Failed to generate recommendations", details }, { status: 500 });
+//   }
+// }
+
+
+
+// import { GoogleGenAI, Type } from '@google/genai';
+// import { NextResponse } from 'next/server';
+
+// const ai = new GoogleGenAI();
+
+// const RecommendationSchema = {
+//   type: Type.OBJECT,
+//   properties: {
+//     projects: {
+//       type: Type.ARRAY,
+//       description: 'List of at least 6 tailored project topics.',
+//       items: {
+//         type: Type.OBJECT,
+//         properties: {
+//           id: { type: Type.STRING },
+//           title: { type: Type.STRING },
+//           description: { type: Type.STRING },
+//           techStack: { 
+//             type: Type.ARRAY, 
+//             items: { type: Type.STRING } 
+//           },
+//           difficulty: { type: Type.STRING },
+//           matchScore: { type: Type.NUMBER },
+//           rationale: { type: Type.STRING },
+//         },
+//         required: ['id', 'title', 'description', 'techStack', 'difficulty', 'matchScore', 'rationale'],
+//       },
+//     },
+//   },
+//   required: ['projects'],
+// };
+
+// export async function POST(req: Request) {
+//   try {
+//     const studentProfile = await req.json();
+
+//     const response = await ai.models.generateContent({
+//       model: 'gemini-2.5-flash',
+//       contents: `Generate customized final-year project recommendations for the following student profile:
+//         - Major: ${studentProfile.major}
+//         - Key Skills: ${studentProfile.skills.join(', ')}
+//         - Domain Interest: ${studentProfile.domain}
+//         - Career Goal: ${studentProfile.careerGoal}
+        
+//         Provide AT LEAST 6 actionable, modern, and distinct project ideas.`,
+//       config: {
+//         systemInstruction: 'You are an academic project advisor. Output structured JSON strictly adhering to the schema provided.',
+//         responseMimeType: 'application/json',
+//         responseSchema: RecommendationSchema,
+//       },
+//     });
+
+//     const data = JSON.parse(response.text || '{}');
+//     return NextResponse.json(data);
+//   } catch (error) {
+//     console.error('Gemini Recommendation Error:', error);
+//     return NextResponse.json({ error: 'Failed to generate recommendations' }, { status: 500 });
+//   }
+// };
+
+
+// import { NextRequest, NextResponse } from 'next/server';
+// import { z } from 'zod';
+// import { getGeminiRecommendation } from '@/app/lib/ai/gemini';
+
+// export const runtime = 'nodejs';
+
+// const requestSchema = z.object({
+//     skills: z.string().min(1, 'Skills are required'),
+//     interests: z.string().min(1, 'Interests are required'),
+//     level: z.string().optional(),
+// });
+
+// interface RecommendedProject {
+//     title: string;
+//     description: string;
+//     tags: string[];
+//     matchReason: string;
+// }
+
+// function buildPrompt(skills: string, interests: string, level?: string): string {
+//     return `You are an academic project advisor. A student has this profile:
+// - Skills: ${skills}
+// - Interests: ${interests}
+// ${level ? `- Level: ${level}` : ''}
+
+// Generate EXACTLY 6 distinct final-year capstone project ideas tailored to this student.
+// Respond with ONLY a JSON array, no markdown fences, no commentary, matching:
+// [{ "title": string, "description": string, "tags": string[], "matchReason": string }]`;
+// }
+
+// function parseRecommendations(raw: string): RecommendedProject[] {
+//     const cleaned = raw.replace(/```json|```/g, '').trim();
+//     const parsed = JSON.parse(cleaned);
+//     if (!Array.isArray(parsed)) throw new Error('Expected an array of recommendations');
+//     return parsed;
+// }
+
+// export async function POST(req: NextRequest) {
+//     if (!process.env.GEMINI_API_KEY) {
+//         console.error('GEMINI_API_KEY is not set');
+//         return NextResponse.json(
+//             { error: 'Recommendation service is not configured' },
+//             { status: 500 }
+//         );
+//     }
+
+//     let body: unknown;
+//     try {
+//         body = await req.json();
+//     } catch {
+//         return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 });
+//     }
+
+//     const parsedBody = requestSchema.safeParse(body);
+//     if (!parsedBody.success) {
+//         return NextResponse.json(
+//             { error: 'Invalid profile data', details: parsedBody.error.flatten().fieldErrors },
+//             { status: 400 }
+//         );
+//     }
+
+//     const { skills, interests, level } = parsedBody.data;
+
+//     try {
+//         const raw = await getGeminiRecommendation(buildPrompt(skills, interests, level));
+
+//         if (!raw) {
+//             return NextResponse.json(
+//                 { error: 'No response from recommendation engine' },
+//                 { status: 502 }
+//             );
+//         }
+
+//         const recommendations = parseRecommendations(raw);
+
+//         if (recommendations.length < 6) {
+//             console.warn(`Expected 6+ recommendations, got ${recommendations.length}`);
+//         }
+
+//         return NextResponse.json({ recommendations }, { status: 200 });
+//     } catch (err) {
+//         console.error('Gemini recommendation error:', err);
+//         return NextResponse.json(
+//             { error: 'Failed to generate recommendations. Please try again.' },
+//             { status: 500 }
+//         );
+//     }
+// }
 

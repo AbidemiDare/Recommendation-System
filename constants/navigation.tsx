@@ -15,7 +15,7 @@ export const navigation = [
   },
   {
     title: "Recommendations",
-    href: "/recommendation",
+    href: "/recommendations",
     icon: Compass,
   },
   {

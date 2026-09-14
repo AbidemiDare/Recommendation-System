@@ -1,76 +1,54 @@
+// Named "auth" to match the existing import path (`@/app/lib/auth`) that
+// profile/page.tsx already expected — it doesn't do authentication, it's
+// the read/write helper for the locally-stored student profile.
+//
+// This is a superset type: onboarding, the profile page, and the
+// recommendation route each read a different subset of these fields off
+// the same "student" object. Worth consolidating to one canonical shape
+// (and dropping the unused half) once the app settles.
+
 export interface StudentProfile {
-  id: string;
+  // Personal info — used by the profile page
+  id?: string;
   name: string;
-  email: string;
-  matricNumber: string;
+  email?: string;
+  matricNumber?: string;
   department: string;
   level: string;
-  interests: string[];
-  skills: string[];
+  interests?: string[];
+  skills?: string[];
+
+  // Recommendation-engine fields — used by /api/recommendations
+  major?: string;
+  technicalSkills?: string[];
+  careerGoals?: string;
+  preferredDomain?: string;
+  complexityPreference?: "Beginner" | "Intermediate" | "Advanced" | "Any";
 }
 
 export const STUDENT_STORAGE_KEY = "student";
 
-export function normalizeStudentProfile(profile?: Partial<StudentProfile> | null): StudentProfile {
-  const base: StudentProfile = {
-    id: typeof profile?.id === "string" ? profile.id : "student-1",
-    name: typeof profile?.name === "string" ? profile.name : "",
-    email: typeof profile?.email === "string" ? profile.email : "",
-    matricNumber: typeof profile?.matricNumber === "string" ? profile.matricNumber : "",
-    department: typeof profile?.department === "string" ? profile.department : "",
-    level: typeof profile?.level === "string" ? profile.level : "",
-    interests: Array.isArray(profile?.interests)
-      ? profile.interests.filter((item): item is string => typeof item === "string")
-      : [],
-    skills: Array.isArray(profile?.skills)
-      ? profile.skills.filter((item): item is string => typeof item === "string")
-      : [],
-  };
-
-  return base;
-}
-
 export function readStudentProfile(): StudentProfile | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
+  if (typeof window === "undefined") return null;
   const raw = localStorage.getItem(STUDENT_STORAGE_KEY);
-  if (!raw) {
-    return null;
-  }
-
+  if (!raw) return null;
   try {
-    return normalizeStudentProfile(JSON.parse(raw) as Partial<StudentProfile>);
-  } catch (error) {
-    console.error("Failed to parse stored student profile", error);
+    return JSON.parse(raw) as StudentProfile;
+  } catch {
     return null;
   }
 }
 
-export function saveStudentProfile(profile: Partial<StudentProfile>): StudentProfile {
-  const nextProfile = normalizeStudentProfile({
-    ...(readStudentProfile() ?? {}),
-    ...profile,
-  });
-
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STUDENT_STORAGE_KEY, JSON.stringify(nextProfile));
-  }
-
-  return nextProfile;
+export function saveStudentProfile(profile: StudentProfile): void {
+  if (typeof window === "undefined") return;
+  // Merge rather than replace: the profile page only ever constructs an
+  // object with its own 8 fields (id/name/email/matricNumber/department/
+  // level/interests/skills), and a plain overwrite would silently delete
+  // major/technicalSkills/careerGoals/preferredDomain/complexityPreference
+  // that onboarding wrote — which is exactly what was breaking
+  // /api/recommendations after a visit to /profile.
+  const current = readStudentProfile();
+  const merged = { ...current, ...profile };
+  localStorage.setItem(STUDENT_STORAGE_KEY, JSON.stringify(merged));
 }
 
-export function logoutDemoStudent(): void {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(STUDENT_STORAGE_KEY);
-  }
-}
-
-export function loginDemoStudent(profile: Partial<StudentProfile>): StudentProfile {
-  return saveStudentProfile(profile);
-}
-
-export function getDemoStudent(): StudentProfile | null {
-  return readStudentProfile();
-}
