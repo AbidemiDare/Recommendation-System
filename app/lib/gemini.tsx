@@ -60,7 +60,7 @@ function buildPrompt(profile: StudentProfile): string {
 
 Student profile:
 - Major: ${profile.major}
-- Technical skills: ${profile.technicalSkills.join(", ")}
+- Technical skills: ${(profile.technicalSkills ?? []).join(", ")}
 - Career goals: ${profile.careerGoals}
 - Preferred domain: ${profile.preferredDomain}
 - Preferred complexity: ${profile.complexityPreference}

@@ -49,6 +49,8 @@ export default function RecommendationDashboard() {
       router.push("/onboarding");
       return;
     }
+    // Local-storage hydration must happen after mount to avoid SSR mismatch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProfile(JSON.parse(raw));
 
     const savedRaw = localStorage.getItem(SAVED_KEY);
@@ -72,6 +74,8 @@ export default function RecommendationDashboard() {
       try {
         const cache: CachedRecommendations = JSON.parse(cacheRaw);
         if (cache.profileSnapshot === JSON.stringify(profile)) {
+          // Cached data is restored after mount from sessionStorage.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setProjects(cache.recommendations);
           setStatus("done");
           return;
@@ -88,7 +92,6 @@ export default function RecommendationDashboard() {
     const controller = new AbortController();
     fetchRecommendations(profile, controller.signal);
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
   async function fetchRecommendations(p: StudentProfile, signal?: AbortSignal) {

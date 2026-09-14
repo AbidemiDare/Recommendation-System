@@ -47,6 +47,8 @@ export default function DashboardPage() {
   // Deferred to useEffect deliberately — reading localStorage during render
   // causes a server/client hydration mismatch (see note above).
   useEffect(() => {
+    // This client-only hydration update is intentional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStudent(readStudentProfile());
 
     const savedRaw = localStorage.getItem(SAVED_KEY);
@@ -119,7 +121,7 @@ export default function DashboardPage() {
     // component's real width rather than trusting either hardcoded number.
     <div className="space-y-8 lg:pl-72 p-8">
       <section>
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1D4ED8] via-[#2563EB] to-[#38BDF8] px-6 py-8 text-white sm:px-8 sm:py-10 lg:px-12 lg:py-12">
+        <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-[#1D4ED8] via-[#2563EB] to-[#38BDF8] px-6 py-8 text-white sm:px-8 sm:py-10 lg:px-12 lg:py-12">
           <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
           <div className="absolute -bottom-16 left-10 h-40 w-40 rounded-full bg-cyan-300/20 blur-2xl" />
 

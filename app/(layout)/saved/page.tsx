@@ -54,6 +54,8 @@ export default function Saved() {
     const raw = localStorage.getItem(SAVED_KEY);
     if (raw) {
       try {
+        // This client-only hydration update is intentional.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSaved(JSON.parse(raw));
       } catch {
         setSaved([]);

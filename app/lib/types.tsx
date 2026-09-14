@@ -14,6 +14,10 @@ export interface ProjectRecommendation {
   domainTags?: string[];
 }
 
+export interface RecommendationResponse {
+  recommendations: ProjectRecommendation[];
+}
+
 // What gets written to localStorage["savedProjects"] when a project is
 // bookmarked — the full recommendation plus when it was saved. Both
 // recommendation-dashboard.tsx (writer) and the Saved page (reader) import

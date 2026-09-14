@@ -42,8 +42,6 @@ const INITIAL_PROFILE: ProfileForm = {
   level: '400 Level',
 };
 
-const STUDENT_STORAGE_KEY = 'student';
-
 // Same taxonomy used by the recommendation engine's project tags, so a
 // student's interests here directly influence their match scores there.
 const AVAILABLE_TAGS = [
@@ -128,6 +126,8 @@ export default function Profile() {
         department: student.department || INITIAL_PROFILE.department,
         level: student.level || INITIAL_PROFILE.level,
       };
+      // Local-storage hydration must happen after mount to avoid SSR mismatch.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm(loaded);
       setDraft(loaded);
       if (Array.isArray(student.interests) && student.interests.length > 0) {
