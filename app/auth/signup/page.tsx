@@ -114,7 +114,7 @@ export default function Signup() {
                 {error.startsWith("An account") && (
                   <>
                     {" "}
-                    <Link href="/login" className="font-semibold underline">
+                    <Link href="/auth/login" className="font-semibold underline">
                       Log in instead
                     </Link>
                   </>

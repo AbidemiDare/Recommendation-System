@@ -51,51 +51,6 @@ const handleSubmit = (e: React.FormEvent) => {
   setError("Account not found. Please sign up to get started.");
 };  
 
-  //   const existing = readStudentProfile();
-  //   const isReturningStudent =
-  //     existing?.email?.trim().toLowerCase() === trimmedEmail;
-
-  //   if (isReturningStudent) {
-  //     // Same student, same browser — keep their saved interests, skills,
-  //     // department, etc. and just refresh the name in case it changed.
-  //     saveStudentProfile({
-  //       ...existing,
-  //       name: trimmedName,
-  //       email: trimmedEmail,
-  //     });
-  //     router.push("/dashboard");
-  //     return;
-  //   }
-
-  //   // New identity on this browser — start a fresh profile. Department,
-  //   // level, interests and skills get filled in during onboarding.
-  //   saveStudentProfile({
-  //     id: existing?.id ?? "student-1",
-  //     name: trimmedName,
-  //     email: trimmedEmail,
-  //     matricNumber: "",
-  //     department: "",
-  //     level: "",
-  //     interests: [],
-  //     skills: [],
-  //   });
-  //   router.push("/onboarding");
-  // };
-
-  {error && (
-  <p className="text-sm text-red-600">
-    {error}
-    {error.startsWith("Account not found") && (
-      <>
-        {" "}
-        <Link href="/signup" className="font-semibold underline">
-          Sign up
-        </Link>
-      </>
-    )}
-  </p>
-)}
-
   return (
     <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#F8F8F8] px-6 py-10 font-sans">
       <BackgroundCircles />
@@ -142,7 +97,21 @@ const handleSubmit = (e: React.FormEvent) => {
               </div>
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {/* {error && <p className="text-sm text-red-600">{error}</p>} */}
+
+             {error && (
+  <p className="text-sm text-red-600">
+    {error}
+    {error.startsWith("Account not found") && (
+      <>
+        {" "}
+        <Link href="/signup" className="font-semibold underline">
+          Sign up
+        </Link>
+      </>
+    )}
+  </p>
+)}
 
             <button
               type="submit"
@@ -156,7 +125,7 @@ const handleSubmit = (e: React.FormEvent) => {
 
         <p className="mt-6 text-center text-sm text-[#64748B] sm:text-base">
           New here?{" "}
-          <Link href="/signup" className="font-semibold text-[#2563EB] hover:underline">
+          <Link href="/auth/signup" className="font-semibold text-[#2563EB] hover:underline">
             Get started
           </Link>
         </p>

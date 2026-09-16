@@ -14,6 +14,7 @@ import {
   User,
   X,
 } from 'lucide-react';
+import { INTEREST_PRESETS } from "@/app/lib/interests";
 
 interface ProfileForm {
   fullName: string;
@@ -42,19 +43,10 @@ const INITIAL_PROFILE: ProfileForm = {
   level: '400 Level',
 };
 
-// Same taxonomy used by the recommendation engine's project tags, so a
-// student's interests here directly influence their match scores there.
-const AVAILABLE_TAGS = [
-  'Artificial Intelligence',
-  'Machine Learning',
-  'Web Development',
-  'Mobile Development',
-  'Cybersecurity',
-  'Data Science',
-  'Cloud Computing',
-  'Internet of Things',
-  'Computer Vision',
-];
+
+// Same taxonomy used by the recommendation engine's project tags — sourced
+// from app/lib/interests so it can never drift from onboarding's list.
+const AVAILABLE_TAGS = INTEREST_PRESETS;
 
 function getInitials(name: string) {
   return name
@@ -380,18 +372,6 @@ export default function Profile() {
     Log out
   </span>
   </button>
-          {/* <button
-            onClick={() => {
-              localStorage.removeItem('student');
-              window.location.href = '/login';
-            }}
-            className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
-          >
-            <span className="flex items-center gap-2">
-              <LogOut size={18} />
-              Log out
-            </span>
-          </button> */}
         </div>
 
         {showLogoutConfirm && (
@@ -420,7 +400,7 @@ export default function Profile() {
         <button
           onClick={() => {
             localStorage.removeItem('student');
-            window.location.href = '/login';
+            window.location.href = '/auth/login';
           }}
           className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-700 active:scale-95"
         >
