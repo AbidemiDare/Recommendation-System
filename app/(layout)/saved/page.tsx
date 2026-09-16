@@ -92,7 +92,7 @@ export default function Saved() {
 
   return (
     <div className="min-h-screen bg-[#F8F8FB] lg:pl-72">
-      <div className="mx-auto max-w-5xl px-6 py-8 lg:px-10 lg:py-10">
+      <div className="mx-auto max-w-5xl p-2 lg:px-10 lg:py-10">
         <div className="mb-6 flex items-center justify-between lg:justify-start lg:gap-4">
           <button
             aria-label="Go back"

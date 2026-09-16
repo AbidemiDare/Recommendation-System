@@ -184,7 +184,7 @@ export default function RecommendationDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F8FB] px-5 py-8 lg:ml-64">
+    <div className="min-h-screen bg-[#F8F8FB] lg:px-5 py-2 lg:py-8 lg:ml-64">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center justify-between">
           <div>

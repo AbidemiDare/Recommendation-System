@@ -56,12 +56,6 @@ const AVAILABLE_TAGS = [
   'Computer Vision',
 ];
 
-// const STATS = [
-//   { label: 'Saved projects', value: 12 },
-//   { label: 'Recommendations viewed', value: 48 },
-//   { label: 'Profile match score', value: '91%' },
-// ];
-
 function getInitials(name: string) {
   return name
     .split(' ')
@@ -114,6 +108,7 @@ export default function Profile() {
   const [skills, setSkills] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Load whatever the onboarding flow (or a previous edit) saved.
   useEffect(() => {
@@ -186,7 +181,7 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-[#F8F8FB] lg:pl-72">
-      <div className="mx-auto max-w-5xl px-6 py-8 lg:px-10 lg:py-10">
+      <div className="mx-auto max-w-5xl p-2 lg:px-10 lg:py-10">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between lg:justify-start lg:gap-4">
           <button
@@ -377,6 +372,15 @@ export default function Profile() {
         {/* Account */}
         <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
           <button
+  onClick={() => setShowLogoutConfirm(true)}
+  className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+>
+  <span className="flex items-center gap-2">
+    <LogOut size={18} />
+    Log out
+  </span>
+  </button>
+          {/* <button
             onClick={() => {
               localStorage.removeItem('student');
               window.location.href = '/login';
@@ -387,8 +391,45 @@ export default function Profile() {
               <LogOut size={18} />
               Log out
             </span>
-          </button>
+          </button> */}
         </div>
+
+        {showLogoutConfirm && (
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
+        <LogOut size={22} className="text-red-600" />
+      </div>
+
+      <h3 className="text-lg font-semibold text-slate-900">Log out?</h3>
+      <p className="mt-1 text-sm text-slate-500">
+        You&apos;ll need to sign back in to view your saved projects and recommendations.
+      </p>
+
+      <div className="mt-6 flex gap-3">
+        <button
+          onClick={() => setShowLogoutConfirm(false)}
+          className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 active:scale-95"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => {
+            localStorage.removeItem('student');
+            window.location.href = '/login';
+          }}
+          className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-700 active:scale-95"
+        >
+          Log out
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );

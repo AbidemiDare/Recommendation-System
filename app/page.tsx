@@ -41,22 +41,22 @@ export default function Home() {
 
         {/* Button */}
         <div className="mt-10">
-          <Link href="/onboarding">
+          <Link href="/auth/signup">
             <button className="h-14 w-full cursor-pointer rounded-2xl bg-[#2563EB] text-base font-semibold text-white transition hover:bg-blue-700">
               Get Started
             </button>
           </Link>
         </div>
       
-        {/* <p className="mt-6 text-sm text-[#64748B] sm:text-base">
+        <p className="mt-6 text-sm text-[#64748B] sm:text-base">
           Already have an account?{" "}
           <Link
-            href="/onboarding"
+            href="/auth/login"
             className="font-semibold text-[#2563EB] hover:underline"
           >
             Login
           </Link>
-        </p> */}
+        </p>
 
       </div>
 

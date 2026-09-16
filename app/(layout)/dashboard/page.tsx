@@ -119,7 +119,7 @@ export default function DashboardPage() {
     // The original `ml-64` here was a different value for presumably the
     // same sidebar — worth confirming against your actual sidebar/layout
     // component's real width rather than trusting either hardcoded number.
-    <div className="space-y-8 lg:pl-72 p-8">
+    <div className="space-y-8 lg:pl-72 lg:p-8">
       <section>
         <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-[#1D4ED8] via-[#2563EB] to-[#38BDF8] px-6 py-8 text-white sm:px-8 sm:py-10 lg:px-12 lg:py-12">
           <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
