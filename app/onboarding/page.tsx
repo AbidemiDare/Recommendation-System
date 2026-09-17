@@ -182,7 +182,211 @@ function OnboardingFields({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* ...rest of the form JSX is unchanged from your original... */}
+          <div className="grid grid-cols-2 gap-3">
+             <div>
+               <label className="mb-2 block text-sm font-medium text-gray-700">Matric number</label>
+              <input
+                type="text"
+                value={matricNumber}
+                onChange={(e) => setMatricNumber(e.target.value)}
+                placeholder="e.g. 190805021"
+                className="h-14 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-900 outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
+              />
+              {errors.matricNumber && <p className="mt-1 text-xs text-red-500">{errors.matricNumber}</p>}
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Department</label>
+              <input
+                type="text"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                placeholder="e.g. Computer Science"
+                className="h-14 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-900 outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
+              />
+              {errors.department && <p className="mt-1 text-xs text-red-500">{errors.department}</p>}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Level</label>
+            <div className="grid grid-cols-5 gap-2">
+              {LEVEL_OPTIONS.map((lvl) => (
+                <button
+                  type="button"
+                  key={lvl}
+                  onClick={() => setLevel(lvl)}
+                  className={`h-11 rounded-xl border text-xs font-medium transition-colors ${
+                    level === lvl
+                      ? "border-[#2563EB] bg-[#2563EB] text-white"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-[#2563EB]/40"
+                  }`}
+                >
+                  {lvl.replace(" Level", "")}
+                </button>
+              ))}
+            </div>
+            {errors.level && <p className="mt-1 text-xs text-red-500">{errors.level}</p>}
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Technical skills</label>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {SKILL_PRESETS.map((skill) => (
+                <button
+                  type="button"
+                  key={skill}
+                  onClick={() => toggleSkill(skill)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    skills.includes(skill)
+                      ? "border-[#2563EB] bg-[#2563EB] text-white"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-[#2563EB]/40"
+                  }`}
+                >
+                  {skill}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={skillInput}
+                onChange={(e) => setSkillInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustomSkill();
+                  }
+                }}
+                placeholder="Add a skill not listed above"
+                className="h-11 flex-1 rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
+              />
+              <button
+                type="button"
+                onClick={addCustomSkill}
+                aria-label="Add skill"
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-[#2563EB]/40"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+            {customSkills.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {customSkills.map((skill) => (
+                  <span
+                    key={skill}
+                    className="flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700"
+                  >
+                    {skill}
+                    <button type="button" onClick={() => removeSkill(skill)} aria-label={`Remove ${skill}`}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {errors.skills && <p className="mt-1 text-xs text-red-500">{errors.skills}</p>}
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Career goals</label>
+            <textarea
+              value={careerGoals}
+              onChange={(e) => setCareerGoals(e.target.value)}
+              placeholder="e.g. I want to work as a backend engineer at a fintech company"
+              rows={3}
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
+            />
+            {errors.careerGoals && <p className="mt-1 text-xs text-red-500">{errors.careerGoals}</p>}
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Interests</label>
+            <p className="mb-3 text-xs text-gray-500">Pick as many as apply — this is what drives your matches.</p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {INTEREST_PRESETS.map((interest) => (
+                <button
+                  type="button"
+                  key={interest}
+                  onClick={() => toggleInterest(interest)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    interests.includes(interest)
+                      ? "border-[#2563EB] bg-[#2563EB] text-white"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-[#2563EB]/40"
+                  }`}
+                >
+                  {interest}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={interestInput}
+                onChange={(e) => setInterestInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustomInterest();
+                  }
+                }}
+                placeholder="Add an interest not listed above"
+                className="h-11 flex-1 rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
+              />
+              <button
+                type="button"
+                onClick={addCustomInterest}
+                aria-label="Add interest"
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-[#2563EB]/40"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+            {customInterests.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {customInterests.map((interest) => (
+                  <span
+                    key={interest}
+                    className="flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700"
+                  >
+                    {interest}
+                    <button type="button" onClick={() => removeInterest(interest)} aria-label={`Remove ${interest}`}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {errors.interests && <p className="mt-1 text-xs text-red-500">{errors.interests}</p>}
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Preferred complexity</label>
+            <div className="grid grid-cols-4 gap-2">
+              {COMPLEXITY_OPTIONS.map((c) => (
+                <button
+                  type="button"
+                  key={c}
+                  onClick={() => setComplexity(c)}
+                  className={`h-11 rounded-xl border text-xs font-medium transition-colors ${
+                    complexity === c
+                      ? "border-[#2563EB] bg-[#2563EB] text-white"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-[#2563EB]/40"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="h-14 w-full rounded-xl bg-[#2563EB] text-sm font-semibold text-white transition-colors hover:bg-[#1d4fd1] disabled:opacity-60"
+          >
+            {submitting ? "Saving..." : "Get my recommendations"}
+          </button>
         </form>
       </div>
     </div>
@@ -363,211 +567,7 @@ function OnboardingFields({
 //         </div>
 
 //         <form onSubmit={handleSubmit} className="space-y-6">
-//           <div className="grid grid-cols-2 gap-3">
-//             <div>
-//               <label className="mb-2 block text-sm font-medium text-gray-700">Matric number</label>
-//               <input
-//                 type="text"
-//                 value={matricNumber}
-//                 onChange={(e) => setMatricNumber(e.target.value)}
-//                 placeholder="e.g. 190805021"
-//                 className="h-14 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-900 outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
-//               />
-//               {errors.matricNumber && <p className="mt-1 text-xs text-red-500">{errors.matricNumber}</p>}
-//             </div>
-
-//             <div>
-//               <label className="mb-2 block text-sm font-medium text-gray-700">Department</label>
-//               <input
-//                 type="text"
-//                 value={department}
-//                 onChange={(e) => setDepartment(e.target.value)}
-//                 placeholder="e.g. Computer Science"
-//                 className="h-14 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-900 outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
-//               />
-//               {errors.department && <p className="mt-1 text-xs text-red-500">{errors.department}</p>}
-//             </div>
-//           </div>
-
-//           <div>
-//             <label className="mb-2 block text-sm font-medium text-gray-700">Level</label>
-//             <div className="grid grid-cols-5 gap-2">
-//               {LEVEL_OPTIONS.map((lvl) => (
-//                 <button
-//                   type="button"
-//                   key={lvl}
-//                   onClick={() => setLevel(lvl)}
-//                   className={`h-11 rounded-xl border text-xs font-medium transition-colors ${
-//                     level === lvl
-//                       ? "border-[#2563EB] bg-[#2563EB] text-white"
-//                       : "border-gray-200 bg-white text-gray-600 hover:border-[#2563EB]/40"
-//                   }`}
-//                 >
-//                   {lvl.replace(" Level", "")}
-//                 </button>
-//               ))}
-//             </div>
-//             {errors.level && <p className="mt-1 text-xs text-red-500">{errors.level}</p>}
-//           </div>
-
-//           <div>
-//             <label className="mb-2 block text-sm font-medium text-gray-700">Technical skills</label>
-//             <div className="mb-3 flex flex-wrap gap-2">
-//               {SKILL_PRESETS.map((skill) => (
-//                 <button
-//                   type="button"
-//                   key={skill}
-//                   onClick={() => toggleSkill(skill)}
-//                   className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-//                     skills.includes(skill)
-//                       ? "border-[#2563EB] bg-[#2563EB] text-white"
-//                       : "border-gray-200 bg-white text-gray-600 hover:border-[#2563EB]/40"
-//                   }`}
-//                 >
-//                   {skill}
-//                 </button>
-//               ))}
-//             </div>
-//             <div className="flex gap-2">
-//               <input
-//                 type="text"
-//                 value={skillInput}
-//                 onChange={(e) => setSkillInput(e.target.value)}
-//                 onKeyDown={(e) => {
-//                   if (e.key === "Enter") {
-//                     e.preventDefault();
-//                     addCustomSkill();
-//                   }
-//                 }}
-//                 placeholder="Add a skill not listed above"
-//                 className="h-11 flex-1 rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
-//               />
-//               <button
-//                 type="button"
-//                 onClick={addCustomSkill}
-//                 aria-label="Add skill"
-//                 className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-[#2563EB]/40"
-//               >
-//                 <Plus className="h-4 w-4" />
-//               </button>
-//             </div>
-//             {customSkills.length > 0 && (
-//               <div className="mt-3 flex flex-wrap gap-2">
-//                 {customSkills.map((skill) => (
-//                   <span
-//                     key={skill}
-//                     className="flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700"
-//                   >
-//                     {skill}
-//                     <button type="button" onClick={() => removeSkill(skill)} aria-label={`Remove ${skill}`}>
-//                       <X className="h-3 w-3" />
-//                     </button>
-//                   </span>
-//                 ))}
-//               </div>
-//             )}
-//             {errors.skills && <p className="mt-1 text-xs text-red-500">{errors.skills}</p>}
-//           </div>
-
-//           <div>
-//             <label className="mb-2 block text-sm font-medium text-gray-700">Career goals</label>
-//             <textarea
-//               value={careerGoals}
-//               onChange={(e) => setCareerGoals(e.target.value)}
-//               placeholder="e.g. I want to work as a backend engineer at a fintech company"
-//               rows={3}
-//               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
-//             />
-//             {errors.careerGoals && <p className="mt-1 text-xs text-red-500">{errors.careerGoals}</p>}
-//           </div>
-
-//           <div>
-//             <label className="mb-2 block text-sm font-medium text-gray-700">Interests</label>
-//             <p className="mb-3 text-xs text-gray-500">Pick as many as apply — this is what drives your matches.</p>
-//             <div className="mb-3 flex flex-wrap gap-2">
-//               {INTEREST_PRESETS.map((interest) => (
-//                 <button
-//                   type="button"
-//                   key={interest}
-//                   onClick={() => toggleInterest(interest)}
-//                   className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-//                     interests.includes(interest)
-//                       ? "border-[#2563EB] bg-[#2563EB] text-white"
-//                       : "border-gray-200 bg-white text-gray-600 hover:border-[#2563EB]/40"
-//                   }`}
-//                 >
-//                   {interest}
-//                 </button>
-//               ))}
-//             </div>
-//             <div className="flex gap-2">
-//               <input
-//                 type="text"
-//                 value={interestInput}
-//                 onChange={(e) => setInterestInput(e.target.value)}
-//                 onKeyDown={(e) => {
-//                   if (e.key === "Enter") {
-//                     e.preventDefault();
-//                     addCustomInterest();
-//                   }
-//                 }}
-//                 placeholder="Add an interest not listed above"
-//                 className="h-11 flex-1 rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
-//               />
-//               <button
-//                 type="button"
-//                 onClick={addCustomInterest}
-//                 aria-label="Add interest"
-//                 className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-[#2563EB]/40"
-//               >
-//                 <Plus className="h-4 w-4" />
-//               </button>
-//             </div>
-//             {customInterests.length > 0 && (
-//               <div className="mt-3 flex flex-wrap gap-2">
-//                 {customInterests.map((interest) => (
-//                   <span
-//                     key={interest}
-//                     className="flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700"
-//                   >
-//                     {interest}
-//                     <button type="button" onClick={() => removeInterest(interest)} aria-label={`Remove ${interest}`}>
-//                       <X className="h-3 w-3" />
-//                     </button>
-//                   </span>
-//                 ))}
-//               </div>
-//             )}
-//             {errors.interests && <p className="mt-1 text-xs text-red-500">{errors.interests}</p>}
-//           </div>
-
-//           <div>
-//             <label className="mb-2 block text-sm font-medium text-gray-700">Preferred complexity</label>
-//             <div className="grid grid-cols-4 gap-2">
-//               {COMPLEXITY_OPTIONS.map((c) => (
-//                 <button
-//                   type="button"
-//                   key={c}
-//                   onClick={() => setComplexity(c)}
-//                   className={`h-11 rounded-xl border text-xs font-medium transition-colors ${
-//                     complexity === c
-//                       ? "border-[#2563EB] bg-[#2563EB] text-white"
-//                       : "border-gray-200 bg-white text-gray-600 hover:border-[#2563EB]/40"
-//                   }`}
-//                 >
-//                   {c}
-//                 </button>
-//               ))}
-//             </div>
-//           </div>
-
-//           <button
-//             type="submit"
-//             disabled={submitting}
-//             className="h-14 w-full rounded-xl bg-[#2563EB] text-sm font-semibold text-white transition-colors hover:bg-[#1d4fd1] disabled:opacity-60"
-//           >
-//             {submitting ? "Saving..." : "Get my recommendations"}
-//           </button>
+//           
 //         </form>
 //       </div>
 //     </div>
