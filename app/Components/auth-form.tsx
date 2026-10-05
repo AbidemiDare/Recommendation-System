@@ -7,7 +7,7 @@ import { createClient } from "@/app/lib/supabase/client";
 import { saveStudentProfile, readStudentProfile } from "@/app/lib/auth";
 import { AuthField, FormError, buttonClass } from "@/app/Components/AuthShell";
 import { FaGoogle } from "react-icons/fa";
-import SpinnerLink from "@/app/Components/SpinnerLink";
+// import SpinnerLink from "@/app/Components/SpinnerLink";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

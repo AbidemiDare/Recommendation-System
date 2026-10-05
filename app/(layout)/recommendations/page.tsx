@@ -192,7 +192,6 @@ export default function RecommendationDashboard() {
     const controller = new AbortController();
     fetchRecommendations(profile, controller.signal);
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
   // First load and "Try again": full-screen loading and error states.
