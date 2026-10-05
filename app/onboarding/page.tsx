@@ -2,394 +2,245 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GraduationCap, Plus, X } from "lucide-react";
+import { GraduationCap } from "lucide-react";
 import { clearSession } from "@/app/lib/session";
-import { readStudentProfile } from "@/app/lib/auth";
-import { INTEREST_PRESETS } from "../lib/interests";
+import { saveStudentProfile, type StudentProfile } from "@/app/lib/auth";
+import { createClient } from "@/app/lib/supabase/client";
+import { INTEREST_PRESETS } from "@/app/lib/interests";
+import { ChoiceGroup, Field, TagPicker, inputClass } from "@/app/Components/Formcontrols";
 
 const SKILL_PRESETS = [
   "JavaScript", "TypeScript", "Python", "React", "Next.js", "Node.js",
   "Java", "SQL", "Machine Learning", "Flutter", "Firebase", "Django",
-];
+] as const;
+const LEVELS = ["100 Level", "200 Level", "300 Level", "400 Level", "500 Level"] as const;
+const COMPLEXITY = ["Beginner", "Intermediate", "Advanced", "Any"] as const;
+type Complexity = (typeof COMPLEXITY)[number];
 
-const LEVEL_OPTIONS = ["100 Level", "200 Level", "300 Level", "400 Level", "500 Level"];
+type Loaded = StudentProfile;
 
-const COMPLEXITY_OPTIONS = ["Beginner", "Intermediate", "Advanced", "Any"] as const;
-
-type LoadedProfile = {
-  identity: { name: string; email: string };
-  initial: {
-    matricNumber: string;
-    department: string;
-    level: string;
-    skills: string[];
-    interests: string[];
-  };
-};
-
-export default function OnboardingForm() {
+export default function OnboardingPage() {
   const router = useRouter();
-
-  // A single piece of state instead of `identity` + `checkingIdentity` +
-  // five separate prefill setters. The effect below now does exactly ONE
-  // setState call, so there's no cascading-render warning.
-  const [profile, setProfile] = useState<LoadedProfile | "checking">("checking");
+  const [profile, setProfile] = useState<Loaded | null>(null);
 
   useEffect(() => {
-    const existing = readStudentProfile();
-    if (!existing?.name || !existing?.email) {
-      // Redirecting is a call to an external system (the router), not a
-      // setState — fine to do synchronously in the effect.
-      router.push("/signup");
-      return;
+    let cancelled = false;
+
+    async function load() {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.replace("/auth/login");
+        return;
+      }
+
+      // maybeSingle: no error if the row doesn't exist yet
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      // Google puts the name in user_metadata (full_name or name)
+      const meta = user.user_metadata ?? {};
+
+      setProfile({
+        id: user.id,
+        name: data?.full_name || meta.full_name || meta.name || "",
+        email: data?.email || user.email || "",
+        matricNumber: data?.matric_number ?? "",
+        department: data?.department ?? "",
+        level: data?.level ?? "",
+        interests: data?.interests ?? [],
+        skills: data?.skills ?? [],
+        careerGoals: data?.career_goals ?? "",
+        complexityPreference: data?.complexity_preference ?? "Any",
+      });
     }
 
-    setProfile({
-      identity: { name: existing.name, email: existing.email },
-      initial: {
-        matricNumber: existing.matricNumber ?? "",
-        department: existing.department ?? "",
-        level: existing.level ?? "",
-        skills: Array.isArray(existing.skills) ? existing.skills : [],
-        interests: Array.isArray(existing.interests) ? existing.interests : [],
-      },
-    });
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
-  if (profile === "checking") {
+  if (!profile) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F8F8FB]">
-        <p className="text-sm text-gray-500">Loading...</p>
-      </div>
+      <main className="flex min-h-screen items-center justify-center bg-[#F8F8FB]">
+        <p className="text-sm text-gray-500">Loading your profile...</p>
+      </main>
     );
   }
 
-  // Mounted only once we actually have data, so its own state can be
-  // initialized straight from props — no effect required.
-  return <OnboardingFields identity={profile.identity} initial={profile.initial} />;
+  return <OnboardingForm existing={profile} />;
 }
 
-function OnboardingFields({
-  identity,
-  initial,
-}: {
-  identity: { name: string; email: string };
-  initial: LoadedProfile["initial"];
-}) {
+function OnboardingForm({ existing }: { existing: Loaded }) {
   const router = useRouter();
 
-  const [matricNumber, setMatricNumber] = useState(initial.matricNumber);
-  const [level, setLevel] = useState(initial.level);
-  const [department, setDepartment] = useState(initial.department);
-  const [skills, setSkills] = useState<string[]>(initial.skills);
-  const [skillInput, setSkillInput] = useState("");
-  const [careerGoals, setCareerGoals] = useState("");
-  const [interests, setInterests] = useState<string[]>(initial.interests);
-  const [interestInput, setInterestInput] = useState("");
-  const [complexity, setComplexity] = useState<(typeof COMPLEXITY_OPTIONS)[number]>("Any");
-
+  const [matricNumber, setMatricNumber] = useState(existing.matricNumber ?? "");
+  const [department, setDepartment] = useState(existing.department ?? "");
+  const [level, setLevel] = useState(existing.level ?? "");
+  const [skills, setSkills] = useState<string[]>(existing.skills ?? []);
+  const [interests, setInterests] = useState<string[]>(existing.interests ?? []);
+  const [careerGoals, setCareerGoals] = useState(existing.careerGoals ?? "");
+  const [complexity, setComplexity] = useState<Complexity>(existing.complexityPreference ?? "Any");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  function toggleSkill(skill: string) {
-    setSkills((prev) => (prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]));
-  }
-
-  function addCustomSkill() {
-    const trimmed = skillInput.trim();
-    if (trimmed && !skills.includes(trimmed)) {
-      setSkills((prev) => [...prev, trimmed]);
-    }
-    setSkillInput("");
-  }
-
-  function removeSkill(skill: string) {
-    setSkills((prev) => prev.filter((s) => s !== skill));
-  }
-
-  function toggleInterest(interest: string) {
-    setInterests((prev) =>
-      prev.includes(interest) ? prev.filter((i) => i !== interest) : [...prev, interest]
-    );
-  }
-
-  function addCustomInterest() {
-    const trimmed = interestInput.trim();
-    if (trimmed && !interests.some((i) => i.toLowerCase() === trimmed.toLowerCase())) {
-      setInterests((prev) => [...prev, trimmed]);
-    }
-    setInterestInput("");
-  }
-
-  function removeInterest(interest: string) {
-    setInterests((prev) => prev.filter((i) => i !== interest));
-  }
-
   function validate() {
     const next: Record<string, string> = {};
-    if (!matricNumber.trim()) next.matricNumber = "Enter your matric number";
-    if (!level) next.level = "Pick your current level";
-    if (!department.trim()) next.department = "Enter your department";
-    if (skills.length === 0) next.skills = "Pick or add at least one skill";
-    if (!careerGoals.trim()) next.careerGoals = "Tell us where you want this to lead";
-    if (interests.length === 0) next.interests = "Pick or add at least one interest";
+    if (!matricNumber.trim()) next.matricNumber = "Enter your matric number.";
+    if (!department.trim()) next.department = "Enter your department.";
+    if (!level) next.level = "Pick your current level.";
+    if (skills.length === 0) next.skills = "Pick or add at least one skill.";
+    if (!careerGoals.trim()) next.careerGoals = "Tell us what you want this project to lead to.";
+    if (interests.length === 0) next.interests = "Pick or add at least one interest.";
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validate()) return;
+  e.preventDefault();
+  if (!validate()) return;
+  setSubmitting(true);
 
-    const profile = {
-      name: identity.name,
-      email: identity.email,
-      matricNumber: matricNumber.trim(),
-      department: department.trim(),
-      level,
-      interests,
-      skills,
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-      major: department.trim(),
-      technicalSkills: skills,
-      careerGoals: careerGoals.trim(),
-      preferredDomain: interests[0] ?? "",
-      complexityPreference: complexity,
-    };
-
-    setSubmitting(true);
-    clearSession();
-    localStorage.setItem("student", JSON.stringify(profile));
-    router.push("/recommendations");
+  if (!user) {
+    router.replace("/auth/login");
+    return;
   }
 
-  const customSkills = skills.filter((s) => !SKILL_PRESETS.includes(s));
-  const customInterests = interests.filter((i) => !INTEREST_PRESETS.includes(i));
+  // upsert so accounts created before the signup trigger still get a row
+  const { error } = await supabase.from("profiles").upsert({
+    id: user.id,
+      full_name: existing.name,  
+    email: user.email,
+    matric_number: matricNumber.trim(),
+    department: department.trim(),
+    level,
+    interests,
+    skills,
+    career_goals: careerGoals.trim(),
+    complexity_preference: complexity,
+  });
+
+  if (error) {
+    setErrors({ form: error.message });
+    setSubmitting(false);
+    return;
+  }
+
+  clearSession();
+
+  // Keep the localStorage copy in sync for pages not migrated yet.
+  // If your original handler already had a saveStudentProfile call, keep that one instead.
+  saveStudentProfile({
+    ...existing,
+    matricNumber: matricNumber.trim(),
+    department: department.trim(),
+    level,
+    skills,
+    interests,
+    careerGoals: careerGoals.trim(),
+    complexityPreference: complexity,
+  });
+
+  router.push("/dashboard");
+}
+
+  const invalid = (key: string) => (errors[key] ? true : undefined);
 
   return (
-    <div className="min-h-screen bg-[#F8F8FB] px-5 py-8">
+    <main className="min-h-screen bg-[#F8F8FB] px-5 py-8">
       <div className="mx-auto max-w-xl">
-        <div className="mb-8">
+        <header className="mb-8">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#2563EB]/10">
-            <GraduationCap className="h-6 w-6 text-[#2563EB]" />
+            <GraduationCap className="h-6 w-6 text-[#2563EB]" aria-hidden />
           </div>
           <h1 className="text-2xl font-semibold text-gray-900">
-            Hi {identity.name.split(" ")[0]}, tell us about your skills
+            Hi {existing.name.split(" ")[0] || "there"}, tell us about your skills
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            A few academic and interest details so we can match you with final-year project ideas worth building.
+            Your details help us match you with final-year project ideas worth building.
           </p>
-        </div>
+        </header>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-3">
-             <div>
-               <label className="mb-2 block text-sm font-medium text-gray-700">Matric number</label>
+        <form onSubmit={handleSubmit} noValidate className="space-y-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field id="matric" label="Matric number" error={errors.matricNumber}>
               <input
-                type="text"
-                value={matricNumber}
+                id="matric" value={matricNumber} autoComplete="off"
                 onChange={(e) => setMatricNumber(e.target.value)}
-                placeholder="e.g. 190805021"
-                className="h-14 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-900 outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
+                placeholder="e.g. 190805021" aria-invalid={invalid("matricNumber")}
+                className={`${inputClass} h-14 px-4`}
               />
-              {errors.matricNumber && <p className="mt-1 text-xs text-red-500">{errors.matricNumber}</p>}
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Department</label>
+            </Field>
+            <Field id="department" label="Department" error={errors.department}>
               <input
-                type="text"
-                value={department}
+                id="department" value={department} autoComplete="off"
                 onChange={(e) => setDepartment(e.target.value)}
-                placeholder="e.g. Computer Science"
-                className="h-14 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-900 outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
+                placeholder="e.g. Computer Science" aria-invalid={invalid("department")}
+                className={`${inputClass} h-14 px-4`}
               />
-              {errors.department && <p className="mt-1 text-xs text-red-500">{errors.department}</p>}
-            </div>
+            </Field>
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Level</label>
-            <div className="grid grid-cols-5 gap-2">
-              {LEVEL_OPTIONS.map((lvl) => (
-                <button
-                  type="button"
-                  key={lvl}
-                  onClick={() => setLevel(lvl)}
-                  className={`h-11 rounded-xl border text-xs font-medium transition-colors ${
-                    level === lvl
-                      ? "border-[#2563EB] bg-[#2563EB] text-white"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-[#2563EB]/40"
-                  }`}
-                >
-                  {lvl.replace(" Level", "")}
-                </button>
-              ))}
-            </div>
-            {errors.level && <p className="mt-1 text-xs text-red-500">{errors.level}</p>}
-          </div>
+          <ChoiceGroup
+            id="level" legend="Level" options={LEVELS} value={level}
+            onChange={setLevel} format={(l) => l.replace(" Level", "")} error={errors.level}
+          />
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Technical skills</label>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {SKILL_PRESETS.map((skill) => (
-                <button
-                  type="button"
-                  key={skill}
-                  onClick={() => toggleSkill(skill)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    skills.includes(skill)
-                      ? "border-[#2563EB] bg-[#2563EB] text-white"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-[#2563EB]/40"
-                  }`}
-                >
-                  {skill}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={skillInput}
-                onChange={(e) => setSkillInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addCustomSkill();
-                  }
-                }}
-                placeholder="Add a skill not listed above"
-                className="h-11 flex-1 rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
-              />
-              <button
-                type="button"
-                onClick={addCustomSkill}
-                aria-label="Add skill"
-                className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-[#2563EB]/40"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            {customSkills.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {customSkills.map((skill) => (
-                  <span
-                    key={skill}
-                    className="flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700"
-                  >
-                    {skill}
-                    <button type="button" onClick={() => removeSkill(skill)} aria-label={`Remove ${skill}`}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            {errors.skills && <p className="mt-1 text-xs text-red-500">{errors.skills}</p>}
-          </div>
+          <TagPicker
+            id="skills" legend="Technical skills" presets={SKILL_PRESETS}
+            value={skills} onChange={setSkills}
+            placeholder="Add a skill not listed above" error={errors.skills}
+          />
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Career goals</label>
+          <Field id="goals" label="Career goals" error={errors.careerGoals}>
             <textarea
-              value={careerGoals}
+              id="goals" rows={3} value={careerGoals}
               onChange={(e) => setCareerGoals(e.target.value)}
               placeholder="e.g. I want to work as a backend engineer at a fintech company"
-              rows={3}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
+              aria-invalid={invalid("careerGoals")}
+              className={`${inputClass} px-4 py-3`}
             />
-            {errors.careerGoals && <p className="mt-1 text-xs text-red-500">{errors.careerGoals}</p>}
-          </div>
+          </Field>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Interests</label>
-            <p className="mb-3 text-xs text-gray-500">Pick as many as apply — this is what drives your matches.</p>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {INTEREST_PRESETS.map((interest) => (
-                <button
-                  type="button"
-                  key={interest}
-                  onClick={() => toggleInterest(interest)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    interests.includes(interest)
-                      ? "border-[#2563EB] bg-[#2563EB] text-white"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-[#2563EB]/40"
-                  }`}
-                >
-                  {interest}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={interestInput}
-                onChange={(e) => setInterestInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addCustomInterest();
-                  }
-                }}
-                placeholder="Add an interest not listed above"
-                className="h-11 flex-1 rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/20"
-              />
-              <button
-                type="button"
-                onClick={addCustomInterest}
-                aria-label="Add interest"
-                className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:border-[#2563EB]/40"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            {customInterests.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {customInterests.map((interest) => (
-                  <span
-                    key={interest}
-                    className="flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700"
-                  >
-                    {interest}
-                    <button type="button" onClick={() => removeInterest(interest)} aria-label={`Remove ${interest}`}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            {errors.interests && <p className="mt-1 text-xs text-red-500">{errors.interests}</p>}
-          </div>
+          <TagPicker
+            id="interests" legend="Interests"
+            hint="Pick as many as apply. Your interests have the biggest effect on your matches."
+            presets={INTEREST_PRESETS} value={interests} onChange={setInterests}
+            placeholder="Add an interest not listed above" error={errors.interests}
+          />
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Preferred complexity</label>
-            <div className="grid grid-cols-4 gap-2">
-              {COMPLEXITY_OPTIONS.map((c) => (
-                <button
-                  type="button"
-                  key={c}
-                  onClick={() => setComplexity(c)}
-                  className={`h-11 rounded-xl border text-xs font-medium transition-colors ${
-                    complexity === c
-                      ? "border-[#2563EB] bg-[#2563EB] text-white"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-[#2563EB]/40"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
+          <ChoiceGroup
+            id="complexity" legend="Preferred complexity" options={COMPLEXITY}
+            value={complexity} onChange={setComplexity}
+          />
+
+          {errors.form && (
+  <p role="alert" className="text-sm text-red-600">{errors.form}</p>
+)}
 
           <button
-            type="submit"
-            disabled={submitting}
-            className="h-14 w-full rounded-xl bg-[#2563EB] text-sm font-semibold text-white transition-colors hover:bg-[#1d4fd1] disabled:opacity-60"
+            type="submit" disabled={submitting}
+            className="h-14 w-full rounded-xl bg-[#2563EB] text-sm font-semibold text-white transition-colors hover:bg-[#1d4fd1] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-[#2563EB]"
           >
             {submitting ? "Saving..." : "Get my recommendations"}
           </button>
         </form>
       </div>
-    </div>
+    </main>
   );
 }
 

@@ -12,6 +12,8 @@ export interface ProjectRecommendation {
   matchScore: number;
   rationale: string;
   domainTags?: string[];
+  careerGoals?: string;
+complexityPreference?: "Beginner" | "Intermediate" | "Advanced" | "Any";
 }
 
 export interface RecommendationResponse {

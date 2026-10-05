@@ -15,6 +15,8 @@ import {
   X,
 } from 'lucide-react';
 import { INTEREST_PRESETS } from "@/app/lib/interests";
+import { createClient } from '@/app/lib/supabase/client';
+import { RECOMMENDATIONS_CACHE_KEY } from '@/app/lib/session';
 
 interface ProfileForm {
   fullName: string;
@@ -88,6 +90,18 @@ function writeStoredStudent(update: Partial<StoredStudent>) {
   });
 }
 
+// Returns an error message, or null on success
+async function updateProfileRow(fields: Record<string, unknown>): Promise<string | null> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return 'You are signed out. Please log in again.';
+
+  const { error } = await supabase.from('profiles').update(fields).eq('id', user.id);
+  return error ? error.message : null;
+}
+
 export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState<ProfileForm>(INITIAL_PROFILE);
@@ -101,38 +115,71 @@ export default function Profile() {
   const [tagInput, setTagInput] = useState('');
   const [hasLoaded, setHasLoaded] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+const [saving, setSaving] = useState(false);
+const [loggingOut, setLoggingOut] = useState(false);
 
-  // Load whatever the onboarding flow (or a previous edit) saved.
-  useEffect(() => {
-    const student = readStoredStudent();
-    if (student) {
+useEffect(() => {
+  let cancelled = false;
+
+  async function load() {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { data } = user
+      ? await supabase.from('profiles').select('*').eq('id', user.id).single()
+      : { data: null };
+
+    if (cancelled) return;
+
+    if (data) {
       const loaded: ProfileForm = {
-        fullName: student.name || INITIAL_PROFILE.fullName,
-        email: student.email || INITIAL_PROFILE.email,
-        matricNumber: student.matricNumber || INITIAL_PROFILE.matricNumber,
-        department: student.department || INITIAL_PROFILE.department,
-        level: student.level || INITIAL_PROFILE.level,
+        fullName: data.full_name ?? '',
+        email: data.email ?? user?.email ?? '',
+        matricNumber: data.matric_number ?? '',
+        department: data.department ?? '',
+        level: data.level ?? '',
       };
-      // Local-storage hydration must happen after mount to avoid SSR mismatch.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm(loaded);
       setDraft(loaded);
-      if (Array.isArray(student.interests) && student.interests.length > 0) {
-        setInterests(student.interests);
-      }
-      if (Array.isArray(student.skills)) {
-        setSkills(student.skills);
-      }
+      setInterests(data.interests ?? []);
+      setSkills(data.skills ?? []);
     }
     setHasLoaded(true);
-  }, []);
+  }
 
-  // Keep localStorage in sync whenever interests change (tag toggle or
-  // custom add happens outside the edit/save flow).
-  useEffect(() => {
-    if (!hasLoaded) return; // don't stomp stored data before the initial load
-    writeStoredStudent({ interests });
-  }, [interests, hasLoaded]);
+  load();
+  return () => {
+    cancelled = true;
+  };
+}, []);
+
+  // // Load whatever the onboarding flow (or a previous edit) saved.
+  // useEffect(() => {
+  //   const student = readStoredStudent();
+  //   if (student) {
+  //     const loaded: ProfileForm = {
+  //       fullName: student.name || INITIAL_PROFILE.fullName,
+  //       email: student.email || INITIAL_PROFILE.email,
+  //       matricNumber: student.matricNumber || INITIAL_PROFILE.matricNumber,
+  //       department: student.department || INITIAL_PROFILE.department,
+  //       level: student.level || INITIAL_PROFILE.level,
+  //     };
+  //     // Local-storage hydration must happen after mount to avoid SSR mismatch.
+  //     // eslint-disable-next-line react-hooks/set-state-in-effect
+  //     setForm(loaded);
+  //     setDraft(loaded);
+  //     if (Array.isArray(student.interests) && student.interests.length > 0) {
+  //       setInterests(student.interests);
+  //     }
+  //     if (Array.isArray(student.skills)) {
+  //       setSkills(student.skills);
+  //     }
+  //   }
+  //   setHasLoaded(true);
+  // }, []);
 
   const startEditing = () => {
     setDraft(form);
@@ -144,32 +191,72 @@ export default function Profile() {
     setIsEditing(false);
   };
 
-  const saveEditing = () => {
-    setForm(draft);
-    setIsEditing(false);
-    writeStoredStudent({
-      name: draft.fullName,
-      email: draft.email,
-      matricNumber: draft.matricNumber,
-      department: draft.department,
-      level: draft.level,
-    });
-  };
+  const saveEditing = async () => {
+  setSaving(true);
+  setSaveError(null);
 
-  const toggleInterest = (tag: string) => {
-    setInterests((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  };
+  const err = await updateProfileRow({
+    full_name: draft.fullName.trim(),
+    matric_number: draft.matricNumber.trim(),
+    department: draft.department.trim(),
+    level: draft.level,
+  });
 
-  const addCustomInterest = () => {
-    const value = tagInput.trim();
-    if (value.length === 0) return;
-    if (!interests.some((t) => t.toLowerCase() === value.toLowerCase())) {
-      setInterests((prev) => [...prev, value]);
-    }
-    setTagInput('');
-  };
+  setSaving(false);
+  if (err) {
+    setSaveError(err); // stay in edit mode so nothing is lost
+    return;
+  }
+
+  setForm(draft);
+  setIsEditing(false);
+  writeStoredStudent({
+    name: draft.fullName,
+    matricNumber: draft.matricNumber,
+    department: draft.department,
+    level: draft.level,
+  });
+};
+
+const saveInterests = async (next: string[]) => {
+  const previous = interests;
+  setInterests(next); // optimistic
+  writeStoredStudent({ interests: next });
+
+  const err = await updateProfileRow({ interests: next });
+  if (err) {
+    setInterests(previous); // roll back
+    writeStoredStudent({ interests: previous });
+    setSaveError(err);
+  }
+};
+
+const toggleInterest = (tag: string) =>
+  saveInterests(
+    interests.includes(tag) ? interests.filter((t) => t !== tag) : [...interests, tag]
+  );
+
+const addCustomInterest = () => {
+  const value = tagInput.trim();
+  if (!value) return;
+  if (!interests.some((t) => t.toLowerCase() === value.toLowerCase())) {
+    saveInterests([...interests, value]);
+  }
+  setTagInput('');
+};
+
+const handleLogout = async () => {
+  setLoggingOut(true);
+  const supabase = createClient();
+  await supabase.auth.signOut();
+  localStorage.removeItem('student');
+  sessionStorage.removeItem(RECOMMENDATIONS_CACHE_KEY);
+  window.location.href = '/auth/login';
+};
+
+   if (!hasLoaded) {
+     return <div className="min-h-screen bg-[#F8F8FB] lg:pl-72" />;
+   }
 
   return (
     <div className="min-h-screen bg-[#F8F8FB] lg:pl-72">
@@ -217,17 +304,11 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {STATS.map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-2xl border border-slate-100 bg-white p-4 text-center shadow-sm"
-            >
-              <p className="text-2xl font-bold text-[#2563EB]">{stat.value}</p>
-              <p className="mt-1 text-xs text-slate-500">{stat.label}</p>
-            </div>
-          ))}
-        </div> */}
+           {saveError && (
+     <p role="alert" className="mb-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+       {saveError}
+     </p>
+   )}
 
         {/* Personal information */}
         <div className="mb-6 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
@@ -243,6 +324,7 @@ export default function Profile() {
                   <X size={16} />
                 </button>
                 <button
+                disabled={saving}
                   onClick={saveEditing}
                   aria-label="Save changes"
                   className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#2563EB] text-white transition hover:bg-[#1d4fd1]"
@@ -265,7 +347,7 @@ export default function Profile() {
               label="Email"
               icon={Mail}
               value={isEditing ? draft.email : form.email}
-              editing={isEditing}
+              editing={false}
               onChange={(v) => setDraft((d) => ({ ...d, email: v }))}
             />
             <Field
@@ -398,14 +480,13 @@ export default function Profile() {
           Cancel
         </button>
         <button
-          onClick={() => {
-            localStorage.removeItem('student');
-            window.location.href = '/auth/login';
-          }}
-          className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-700 active:scale-95"
-        >
-          Log out
-        </button>
+  onClick={handleLogout}
+  disabled={loggingOut}
+  className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+>
+  {loggingOut ? 'Logging out...' : 'Log out'}
+</button>
+
       </div>
     </div>
   </div>

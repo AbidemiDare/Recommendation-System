@@ -1,0 +1,46 @@
+create table public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  full_name text,
+  institution text,
+  programme text,
+  academic_level text,
+  skills text[] default '{}',
+  interests text[] default '{}',
+  preferred_domains text[] default '{}',
+  availability_hours_per_week integer,
+  consent_to_ai_processing boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table public.projects (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text not null,
+  domain text,
+  required_skills text[] default '{}',
+  difficulty_level text,
+  supervisor_name text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table public.saved_projects (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.profiles(id) on delete cascade,
+  project_id uuid not null references public.projects(id) on delete cascade,
+  status text not null default 'saved'
+    check (status in ('saved', 'applied', 'not_interested')),
+  created_at timestamptz not null default now(),
+  unique (student_id, project_id)
+);
+
+create table public.recommendation_history (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.profiles(id) on delete cascade,
+  project_id uuid not null references public.projects(id) on delete cascade,
+  recommendation_score numeric(5, 2),
+  explanation text,
+  model_version text,
+  created_at timestamptz not null default now()
+);

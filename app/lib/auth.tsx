@@ -1,12 +1,3 @@
-// Named "auth" to match the existing import path (`@/app/lib/auth`) that
-// profile/page.tsx already expected — it doesn't do authentication, it's
-// the read/write helper for the locally-stored student profile.
-//
-// This is a superset type: onboarding, the profile page, and the
-// recommendation route each read a different subset of these fields off
-// the same "student" object. Worth consolidating to one canonical shape
-// (and dropping the unused half) once the app settles.
-
 export interface StudentProfile {
   // Personal info — used by the profile page
   id?: string;
